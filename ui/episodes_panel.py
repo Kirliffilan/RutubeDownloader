@@ -22,7 +22,7 @@ class EpisodesPanel(ctk.CTkFrame):
 
         top.pack(
             fill="x",
-            pady=(0,10)
+            pady=(0, 10)
         )
 
         ctk.CTkButton(
@@ -70,11 +70,25 @@ class EpisodesPanel(ctk.CTkFrame):
         self.checkboxes.clear()
 
         for item in episodes:
-            text = (
-                f"{item['season']} сезон "
-                f"{item['episode']} серия"
-                f"  |  {item['title']}"
+            season = item.get(
+                "season"
             )
+
+            episode = item.get(
+                "episode"
+            )
+
+            if season and episode:
+                text = (
+                    f"{season} сезон "
+                    f"{episode} серия"
+                    f" | {item['title']}"
+                )
+
+            else:
+                text = (
+                    f"🎬 {item['title']}"
+                )
 
             checkbox = ctk.CTkCheckBox(
                 self.scroll,

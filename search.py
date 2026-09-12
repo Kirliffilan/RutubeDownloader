@@ -6,13 +6,15 @@ from rutube import api_get
 
 class Searcher:
     def __init__(self):
-        self.stopped = False
+        self.stop = False
+
 
     def stop_search(self):
-        self.stopped = True
+        self.stop = True
+
 
     def search_episode(self, show_name, author_id, season, episode):
-        if self.stopped:
+        if self.stop:
             return None
 
         query = (
@@ -34,17 +36,26 @@ class Searcher:
         except Exception:
             return None
 
-        for item in data.get("results", []):
+
+        for item in data.get(
+            "results",
+            []
+        ):
 
             title = str(
-                item.get("title", "")
+                item.get(
+                    "title",
+                    ""
+                )
             ).strip()
+
 
             pattern = (
                 rf"{re.escape(show_name)}"
                 rf".*{season}\s*сезон"
                 rf".*{episode}\s*серия"
             )
+
 
             if not re.search(
                 pattern,
@@ -53,6 +64,7 @@ class Searcher:
             ):
                 continue
 
+
             author = item.get(
                 "author",
                 {}
@@ -60,16 +72,31 @@ class Searcher:
 
             item_author = None
 
-            if isinstance(author, dict):
-                item_author = author.get("id")
+            if isinstance(
+                author,
+                dict
+            ):
+                item_author = author.get(
+                    "id"
+                )
 
-            if author_id and item_author and str(author_id) != str(item_author):
+
+            if (
+                author_id
+                and item_author
+                and str(author_id) != str(item_author)
+            ):
                 continue
 
-            video_id = item.get("id")
+
+            video_id = item.get(
+                "id"
+            )
+
 
             if not video_id:
                 continue
+
 
             return {
                 "show_name": show_name,
@@ -77,28 +104,33 @@ class Searcher:
                 "url": f"https://rutube.ru/video/{video_id}/",
                 "title": title,
                 "season": season,
-                "episode": episode,
+                "episode": episode
             }
+
 
         return None
 
+
     def find_seasons(self, video_info, settings, callback=None):
-        self.stopped = False
+        self.stop = False
 
         show_name = video_info["show_name"]
         author_id = video_info["author_id"]
 
         seasons = {}
+
         tasks = []
 
         for season in range(
             1,
             settings["max_seasons"] + 1
         ):
+
             for episode in range(
                 1,
                 settings["max_episodes"] + 1
             ):
+
                 tasks.append(
                     (
                         season,
@@ -106,11 +138,13 @@ class Searcher:
                     )
                 )
 
+
         if callback:
             callback(
                 "log",
                 f"Проверок: {len(tasks)}"
             )
+
 
         with ThreadPoolExecutor(
             max_workers=10
@@ -119,6 +153,7 @@ class Searcher:
             futures = []
 
             for season, episode in tasks:
+
                 futures.append(
                     executor.submit(
                         self.search_episode,
@@ -129,27 +164,37 @@ class Searcher:
                     )
                 )
 
-            for future in as_completed(futures):
 
-                if self.stopped:
+            for future in as_completed(
+                futures
+            ):
+
+                if self.stop:
                     break
+
 
                 result = future.result()
 
+
                 if result:
+
                     season = result["season"]
                     episode = result["episode"]
+
 
                     if season not in seasons:
                         seasons[season] = {}
 
+
                     seasons[season][episode] = result
+
 
                     if callback:
                         callback(
                             "log",
                             f"Найдена: {season} сезон {episode} серия"
                         )
+
 
         if callback:
             count = sum(
@@ -161,5 +206,6 @@ class Searcher:
                 "log",
                 f"Всего найдено: {count}"
             )
+
 
         return seasons

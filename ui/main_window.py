@@ -24,8 +24,13 @@ class MainWindow(ctk.CTkFrame):
         self.video = None
         self.episodes = []
         self.error_overlay = None
-        self.downloader = Downloader()
+
         self.searcher = Searcher()
+        self.downloader = Downloader()
+
+        self.download_mode = ctk.StringVar(
+            value="Видео"
+        )
 
         self.create_widgets()
 
@@ -42,26 +47,20 @@ class MainWindow(ctk.CTkFrame):
         )
 
         self.grid_rowconfigure(
-            5,
+            6,
             weight=1
         )
 
-        title = ctk.CTkLabel(
+        ctk.CTkLabel(
             self,
             text="🎬 Rutube Downloader",
-            font=(
-                "Segoe UI",
-                26,
-                "bold"
-            )
-        )
-
-        title.grid(
+            font=("Segoe UI", 26, "bold")
+        ).grid(
             row=0,
             column=0,
             columnspan=2,
             sticky="w",
-            pady=(0,20)
+            pady=(0, 20)
         )
 
         url_frame = ctk.CTkFrame(
@@ -174,6 +173,39 @@ class MainWindow(ctk.CTkFrame):
             side="left"
         )
 
+        mode_frame = ctk.CTkFrame(
+            self,
+            fg_color="transparent"
+        )
+
+        mode_frame.grid(
+            row=3,
+            column=0,
+            columnspan=2,
+            sticky="w",
+            pady=5
+        )
+
+        ctk.CTkRadioButton(
+            mode_frame,
+            text="🎬 Видео",
+            variable=self.download_mode,
+            value="Видео"
+        ).pack(
+            side="left",
+            padx=10
+        )
+
+        ctk.CTkRadioButton(
+            mode_frame,
+            text="📺 Сериал",
+            variable=self.download_mode,
+            value="Сериал"
+        ).pack(
+            side="left",
+            padx=10
+        )
+
         info = ctk.CTkFrame(
             self,
             fg_color="#151a27",
@@ -183,7 +215,7 @@ class MainWindow(ctk.CTkFrame):
         )
 
         info.grid(
-            row=3,
+            row=4,
             column=0,
             columnspan=2,
             sticky="ew",
@@ -193,11 +225,7 @@ class MainWindow(ctk.CTkFrame):
         ctk.CTkLabel(
             info,
             text="Информация",
-            font=(
-                "Segoe UI",
-                16,
-                "bold"
-            )
+            font=("Segoe UI", 16, "bold")
         ).pack(
             anchor="w",
             padx=15,
@@ -225,10 +253,10 @@ class MainWindow(ctk.CTkFrame):
         )
 
         left.grid(
-            row=5,
+            row=6,
             column=0,
             sticky="nsew",
-            padx=(0,10)
+            padx=(0, 10)
         )
 
         right = ctk.CTkFrame(
@@ -240,7 +268,7 @@ class MainWindow(ctk.CTkFrame):
         )
 
         right.grid(
-            row=5,
+            row=6,
             column=1,
             sticky="nsew"
         )
@@ -292,6 +320,7 @@ class MainWindow(ctk.CTkFrame):
             padx=10,
             pady=10
         )
+
 
     def show_error(self, text):
         if self.error_overlay:
@@ -380,16 +409,31 @@ class MainWindow(ctk.CTkFrame):
                 f"Название: {self.video['title']}\n"
                 f"Автор: {self.video['author_name']}\n"
                 f"Сериал: {self.video['show_name']}\n"
-                f"Сезон: {self.video['season']}\n"
-                f"Серия: {self.video['episode']}"
+                f"Сезон: {self.video.get('season') or '-'}\n"
+                f"Серия: {self.video.get('episode') or '-'}"
             )
         )
-
 
     def search(self):
         if not self.video:
             self.show_error(
                 "Сначала получите информацию"
+            )
+
+            return
+
+        if self.download_mode.get() == "Видео":
+            self.episodes = [
+                self.video
+            ]
+
+            self.episodes_panel.set_episodes(
+                self.episodes
+            )
+
+            self.log_panel.callback(
+                "log",
+                "Добавлено видео"
             )
 
             return
@@ -428,7 +472,7 @@ class MainWindow(ctk.CTkFrame):
 
         if not selected:
             self.show_error(
-                "Выберите серии для скачивания"
+                "Выберите видео"
             )
 
             return
@@ -437,7 +481,10 @@ class MainWindow(ctk.CTkFrame):
             target=lambda: self.downloader.download_all(
                 selected,
                 self.settings,
-                self.video["show_name"],
+                self.video.get(
+                    "show_name",
+                    "Видео"
+                ),
                 self.log_panel.callback
             ),
             daemon=True

@@ -1,25 +1,36 @@
 import re
+import time
 import requests
 
 
-def get_headers():
-    return {
-        "User-Agent": "Mozilla/5.0",
-        "Referer": "https://rutube.ru/"
-    }
+HEADERS = {
+    "User-Agent": "Mozilla/5.0",
+    "Referer": "https://rutube.ru/"
+}
 
 
 def api_get(url, params=None):
-    response = requests.get(
-        url,
-        headers=get_headers(),
-        params=params,
-        timeout=30
-    )
+    last_error = None
 
-    response.raise_for_status()
+    for _ in range(3):
+        try:
+            response = requests.get(
+                url,
+                headers=HEADERS,
+                params=params,
+                timeout=30
+            )
 
-    return response.json()
+            response.raise_for_status()
+
+            return response.json()
+
+        except requests.exceptions.RequestException as e:
+            last_error = e
+
+            time.sleep(2)
+
+    raise last_error
 
 
 def get_video_id(url):
@@ -43,7 +54,9 @@ def get_video_id(url):
 
 
 def get_video_info(url):
-    video_id = get_video_id(url)
+    video_id = get_video_id(
+        url
+    )
 
     data = api_get(
         f"https://rutube.ru/api/video/{video_id}/"
@@ -88,31 +101,45 @@ def get_video_info(url):
     season = None
     episode = None
 
-    if season_match:
+    if season_match and episode_match:
         season = int(
             season_match.group(1)
         )
 
-    if episode_match:
         episode = int(
             episode_match.group(1)
         )
 
-    show_name = re.sub(
-        r"\s*\d+\s*сезон.*",
-        "",
-        title,
-        flags=re.IGNORECASE
-    ).strip()
+    if season and episode:
+        show_name = re.sub(
+            r"\s*\d+\s*сезон.*",
+            "",
+            title,
+            flags=re.IGNORECASE
+        ).strip()
+
+    else:
+        show_name = title.strip()
 
     return {
         "id": video_id,
         "rutube_id": video_id,
+        "url": url,
         "title": title,
         "author_id": author_id,
         "author_name": author_name,
         "show_name": show_name,
         "season": season,
-        "episode": episode,
-        "url": url
+        "episode": episode
     }
+
+
+def search_video(query):
+    return api_get(
+        "https://rutube.ru/api/search/video/",
+        {
+            "query": query,
+            "page": 1,
+            "limit": 10
+        }
+    )

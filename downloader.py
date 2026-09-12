@@ -5,43 +5,68 @@ from database import log_error, save_history
 from utils import clean_filename
 
 
+STOP_DOWNLOAD = False
+
+
 class Downloader:
     def __init__(self):
-        self.stopped = False
+        self.stop = False
+
 
     def stop_download(self):
-        self.stopped = True
+        self.stop = True
+
 
     def get_format(self, quality):
-        if quality in ("best", "Максимальное"):
+        if quality in (
+            "best",
+            "Максимальное"
+        ):
             return "bestvideo+bestaudio/best"
 
         try:
-            quality = int(quality)
-        except ValueError:
+            quality = int(
+                quality
+            )
+
+        except Exception:
             return "bestvideo+bestaudio/best"
 
         return (
-            f"bestvideo[height<={quality}]+bestaudio/"
+            f"bestvideo[height<={quality}]"
+            "+bestaudio/"
             f"best[height<={quality}]"
         )
 
+
     def find_downloaded_file(self, folder, title):
-        if not os.path.exists(folder):
+        if not os.path.exists(
+            folder
+        ):
             return None
 
-        title = clean_filename(title).lower()
+        title = clean_filename(
+            title
+        ).lower()
 
         for file in os.listdir(folder):
-            if not file.lower().endswith(".mp4"):
+            if not file.lower().endswith(
+                ".mp4"
+            ):
                 continue
 
-            name = clean_filename(file).lower()
+            name = clean_filename(
+                file
+            ).lower()
 
             if title in name:
-                return os.path.join(folder, file)
+                return os.path.join(
+                    folder,
+                    file
+                )
 
         return None
+
 
     def format_speed(self, speed):
         if not speed:
@@ -49,27 +74,36 @@ class Downloader:
 
         return f"{speed / 1024 / 1024:.2f} MB/s"
 
+
     def format_eta(self, seconds):
         if seconds is None:
             return ""
 
-        seconds = int(seconds)
+        seconds = int(
+            seconds
+        )
 
-        return f"{seconds // 60}:{seconds % 60:02d}"
+        minutes = seconds // 60
+        sec = seconds % 60
+
+        return f"{minutes}:{sec:02d}"
+
 
     def progress_hook(self, callback):
         last_speed = ""
         last_eta = ""
 
         def hook(data):
-            nonlocal last_speed, last_eta
+            nonlocal last_speed
+            nonlocal last_eta
 
-            if self.stopped:
+            if self.stop:
                 raise Exception(
                     "Остановлено пользователем"
                 )
 
             if data["status"] == "downloading":
+
                 total = (
                     data.get("total_bytes")
                     or data.get("total_bytes_estimate")
@@ -77,31 +111,34 @@ class Downloader:
 
                 if data.get("speed"):
                     last_speed = self.format_speed(
-                        data["speed"]
+                        data.get("speed")
                     )
 
                 if data.get("eta") is not None:
                     last_eta = self.format_eta(
-                        data["eta"]
+                        data.get("eta")
                     )
 
                 if total:
+                    percent = (
+                        data["downloaded_bytes"]
+                        /
+                        total
+                        *
+                        100
+                    )
+
                     callback(
                         "progress",
                         {
-                            "percent": (
-                                data["downloaded_bytes"]
-                                /
-                                total
-                                *
-                                100
-                            ),
+                            "percent": percent,
                             "speed": last_speed,
                             "eta": last_eta
                         }
                     )
 
             elif data["status"] == "finished":
+
                 callback(
                     "progress",
                     {
@@ -118,18 +155,31 @@ class Downloader:
 
         return hook
 
+
     def download_episode(self, item, settings, show_name, callback):
-        if self.stopped:
+        if self.stop:
             return False
 
-        season = item["season"]
-        episode = item["episode"]
-
-        folder = os.path.join(
-            settings["save_path"],
-            show_name,
-            f"{season} сезон"
+        season = item.get(
+            "season"
         )
+
+        episode = item.get(
+            "episode"
+        )
+
+        if season and episode:
+            folder = os.path.join(
+                settings["save_path"],
+                show_name,
+                f"{season} сезон"
+            )
+
+        else:
+            folder = os.path.join(
+                settings["save_path"],
+                show_name
+            )
 
         os.makedirs(
             folder,
@@ -142,46 +192,86 @@ class Downloader:
         ):
             callback(
                 "log",
-                f"Пропуск: {season} сезон {episode} серия"
+                "Файл уже существует"
             )
 
             return "skip"
 
-        callback(
-            "log",
-            f"Скачивание: {season} сезон {episode} серия"
-        )
+
+        if season and episode:
+            callback(
+                "log",
+                f"Скачивание: {season} сезон {episode} серия"
+            )
+
+        else:
+            callback(
+                "log",
+                "Скачивание видео"
+            )
 
         options = {
             "format": self.get_format(
                 settings["quality"]
             ),
+
             "outtmpl": os.path.join(
                 folder,
                 "%(title)s.%(ext)s"
             ),
+
             "merge_output_format": "mp4",
+
             "continuedl": True,
+
+            "socket_timeout": 60,
+
+            "fragment_timeout": 60,
+
             "retries": 30,
+
             "fragment_retries": 30,
+
+            "file_access_retries": 10,
+
             "concurrent_fragment_downloads": 16,
+
+            "http_chunk_size": 10485760,
+
+            "hls_use_mpegts": False,
+
+            "nopart": False,
+
+            "keepvideo": False,
+
             "progress_hooks": [
-                self.progress_hook(callback)
+                self.progress_hook(
+                    callback
+                )
             ]
         }
 
+
         try:
-            with yt_dlp.YoutubeDL(options) as ydl:
+            with yt_dlp.YoutubeDL(
+                options
+            ) as ydl:
+
                 ydl.download(
-                    [item["url"]]
+                    [
+                        item["url"]
+                    ]
                 )
 
+
         except Exception as e:
-            if self.stopped:
+
+            if self.stop:
                 callback(
                     "log",
                     "Скачивание остановлено"
                 )
+
             else:
                 log_error(
                     str(e)
@@ -194,8 +284,6 @@ class Downloader:
 
             return False
 
-        if self.stopped:
-            return False
 
         file = self.find_downloaded_file(
             folder,
@@ -210,16 +298,23 @@ class Downloader:
 
         return True
 
+
     def download_all(self, selected, settings, show_name, callback):
-        self.stopped = False
+        self.stop = False
 
         success = 0
         skipped = 0
 
-        total = len(selected)
+        total = len(
+            selected
+        )
 
-        for index, item in enumerate(selected, 1):
-            if self.stopped:
+        for index, item in enumerate(
+            selected,
+            1
+        ):
+
+            if self.stop:
                 callback(
                     "log",
                     "Загрузка отменена"
@@ -244,6 +339,7 @@ class Downloader:
 
             elif result:
                 success += 1
+
 
         callback(
             "progress",

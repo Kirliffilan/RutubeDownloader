@@ -1,0 +1,4 @@
+config.json
+rutube_downloader.db
+dist/
+debug/
