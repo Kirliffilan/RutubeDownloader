@@ -23,9 +23,9 @@
 
 ## Windows
 
-1. Скачайте последнюю версию программы из Releases.
-2. Распакуйте архив.
-3. Запустите:
+1. [Скачайте последнюю версию программы из Releases.](https://github.com/Kirliffilan/RutubeDownloader/releases/latest)
+3. Распакуйте архив.
+4. Запустите:
 
 ```
 RutubeDownloader.exe
