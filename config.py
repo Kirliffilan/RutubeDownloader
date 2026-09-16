@@ -11,18 +11,11 @@ def get_base_path():
 
 
 def get_config_path():
-    return os.path.join(
-        get_base_path(),
-        "config.json"
-    )
+    return os.path.join(get_base_path(), "config.json")
 
 
 def get_default_save_path():
-    return os.path.join(
-        os.path.expanduser("~"),
-        "Videos",
-        "RutubeDownloader"
-    )
+    return os.path.join(os.path.expanduser("~"), "Videos", "RutubeDownloader")
 
 
 def get_default_settings():
@@ -30,7 +23,7 @@ def get_default_settings():
         "save_path": get_default_save_path(),
         "quality": "Максимальное",
         "max_seasons": 2,
-        "max_episodes": 2
+        "max_episodes": 2,
     }
 
 
@@ -44,11 +37,7 @@ def get_settings():
         return settings
 
     try:
-        with open(
-            path,
-            "r",
-            encoding="utf-8"
-        ) as file:
+        with open(path, "r", encoding="utf-8") as file:
             settings = json.load(file)
 
     except Exception:
@@ -69,14 +58,5 @@ def get_settings():
 def save_settings(settings):
     path = get_config_path()
 
-    with open(
-        path,
-        "w",
-        encoding="utf-8"
-    ) as file:
-        json.dump(
-            settings,
-            file,
-            ensure_ascii=False,
-            indent=4
-        )
+    with open(path, "w", encoding="utf-8") as file:
+        json.dump(settings, file, ensure_ascii=False, indent=4)

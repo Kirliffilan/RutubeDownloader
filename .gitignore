@@ -1,4 +1,5 @@
 config.json
 rutube_downloader.db
+*.spec
 dist/
-debug/
+build/
