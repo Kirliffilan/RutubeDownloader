@@ -6,6 +6,7 @@ from config import get_settings, save_settings
 from rutube import get_video_info
 from search import Searcher
 from downloader import Downloader
+from utils import get_video_size
 
 from ui.settings_window import SettingsWindow
 from ui.episodes_panel import EpisodesPanel
@@ -213,6 +214,7 @@ class MainWindow(ctk.CTkFrame):
         try:
             self.video = get_video_info(self.url_entry.get())
             self.after(0, self.update_info)
+            self.video["size"] = get_video_size(self.video["url"], self.settings["quality"])
 
         except Exception as e:
             self.after(0, lambda: self.show_error(str(e)))

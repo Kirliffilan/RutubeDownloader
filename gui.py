@@ -2,7 +2,6 @@ import customtkinter as ctk
 
 from ui.main_window import MainWindow
 
-
 class App(ctk.CTk):
     def __init__(self):
         super().__init__()
@@ -18,12 +17,8 @@ class App(ctk.CTk):
 
     def center_window(self):
         self.update_idletasks()
-
         width = 1200
         height = 800
-
         x = (self.winfo_screenwidth() - width) // 2
-
         y = (self.winfo_screenheight() - height) // 2
-
         self.geometry(f"{width}x{height}+{x}+{y}")
