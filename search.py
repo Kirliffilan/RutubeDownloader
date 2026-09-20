@@ -86,9 +86,13 @@ class Searcher:
         seasons = {}
         tasks = []
 
-        for season in range(1, settings["max_seasons"] + 1):
+        if self.has_season:
+            for season in range(1, settings["max_seasons"] + 1):
+                for episode in range(1, settings["max_episodes"] + 1):
+                    tasks.append((season, episode))
+        else:
             for episode in range(1, settings["max_episodes"] + 1):
-                tasks.append((season, episode))
+                tasks.append((1, episode))
 
         if callback:
             callback("log", f"Проверок: {len(tasks)}")
