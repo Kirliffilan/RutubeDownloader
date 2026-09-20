@@ -61,14 +61,14 @@ def get_video_info(url):
     season = None
     episode = None
 
-    if season_match and episode_match:
-        season = int(season_match.group(1))
-
+    if episode_match:
         episode = int(episode_match.group(1))
+        season = int(season_match.group(1)) if season_match else 1
 
-    if season and episode:
-        show_name = re.sub(r"\s*\d+\s*сезон.*", "", title, flags=re.IGNORECASE).strip()
-
+    if episode:
+        show_name = re.sub(
+            r"\s*\d+\s*сезон.*|\s*\d+\s*серия.*", "", title, flags=re.IGNORECASE
+        ).strip()
     else:
         show_name = title.strip()
 

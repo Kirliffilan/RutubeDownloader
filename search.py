@@ -7,6 +7,7 @@ from utils import get_video_size
 
 class Searcher:
     def __init__(self):
+        self.has_season = False
         self.stop = False
 
     def stop_search(self):
@@ -16,7 +17,11 @@ class Searcher:
         if self.stop:
             return None
 
-        query = f"{show_name} " f"{season} сезон " f"{episode} серия"
+        query = (
+            f"{show_name} {season} сезон {episode} серия"
+            if self.has_season
+            else f"{show_name} {episode} серия"
+        )
 
         try:
             data = api_get(
@@ -28,13 +33,12 @@ class Searcher:
             return None
 
         for item in data.get("results", []):
-
             title = str(item.get("title", "")).strip()
 
             pattern = (
-                rf"{re.escape(show_name)}"
-                rf".*{season}\s*сезон"
-                rf".*{episode}\s*серия"
+                rf"{re.escape(show_name)}.*{season}\s*сезон.*{episode}\s*серия"
+                if self.has_season
+                else rf"{re.escape(show_name)}.*{episode}\s*серия"
             )
 
             if not re.search(pattern, title, re.IGNORECASE):
@@ -77,24 +81,22 @@ class Searcher:
         show_name = video_info["show_name"]
         author_id = video_info["author_id"]
 
+        self.has_season = bool(re.search(r"\b\d+\s*сезон\b", video_info["title"], re.IGNORECASE))
+
         seasons = {}
         tasks = []
 
         for season in range(1, settings["max_seasons"] + 1):
-
             for episode in range(1, settings["max_episodes"] + 1):
-
                 tasks.append((season, episode))
 
         if callback:
             callback("log", f"Проверок: {len(tasks)}")
 
         with ThreadPoolExecutor(max_workers=10) as executor:
-
             futures = []
 
             for season, episode in tasks:
-
                 futures.append(
                     executor.submit(
                         self.search_episode,
@@ -107,24 +109,18 @@ class Searcher:
                 )
 
             for future in as_completed(futures):
-
                 if self.stop:
                     break
 
                 result = future.result()
 
                 if result:
-
                     season = result["season"]
                     episode = result["episode"]
-
                     if season not in seasons:
                         seasons[season] = {}
-
                     seasons[season][episode] = result
-
                     size_mb = result.get("size", 0) / 1024 / 1024
-
                     callback(
                         "log",
                         f"Найдена: {season} сезон {episode} серия | Размер: {size_mb:.0f} MB",
@@ -132,7 +128,6 @@ class Searcher:
 
         if callback:
             count = sum(len(x) for x in seasons.values())
-
             total_size = sum(
                 item.get("size", 0)
                 for season in seasons.values()
@@ -140,7 +135,6 @@ class Searcher:
             )
 
             callback("log", f"Всего найдено: {count}")
-
             callback(
                 "log",
                 f"Общий размер найденных видео: {total_size / 1024 / 1024 / 1024:.2f} GB",
