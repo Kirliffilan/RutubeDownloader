@@ -69,6 +69,7 @@ class EpisodesPanel(ctk.CTkFrame):
             checkbox.pack(fill="x", padx=10, pady=5)
 
             self.checkboxes.append(checkbox)
+            checkbox.select()
 
     def select_all(self):
         for checkbox in self.checkboxes:

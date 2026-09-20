@@ -207,17 +207,40 @@ class MainWindow(ctk.CTkFrame):
         self.settings = data
         save_settings(data)
 
+    def try_insert(self) -> bool:
+        try:
+            url = self.clipboard_get().strip()
+            self.url_entry.insert(0, url)
+            return True
+        except Exception:
+            return False
+
     def load_video(self):
         threading.Thread(target=self.get_video, daemon=True).start()
 
-    def get_video(self):
+    def get_video(self) -> bool:
+        url = self.url_entry.get().strip()
+
+        if not url or "rutube.ru" not in url:
+            self.url_entry.delete(0, "end")
+            if not self.try_insert():
+                self.after(0, lambda: self.show_error("Вставьте ссылку"))
+                return False
+            url = self.url_entry.get().strip()
+
+        if not url or "rutube.ru" not in url:
+            self.after(0, lambda: self.show_error("Вставьте ссылку"))
+            return False
+
         try:
-            self.video = get_video_info(self.url_entry.get())
+            self.video = get_video_info(url)
             self.after(0, self.update_info)
             self.video["size"] = get_video_size(self.video["url"], self.settings["quality"])
-
+            return True
         except Exception as e:
             self.after(0, lambda: self.show_error(str(e)))
+            return False
+
 
     def update_info(self):
         self.info.delete("0.0", "end")
@@ -234,8 +257,8 @@ class MainWindow(ctk.CTkFrame):
 
     def search(self):
         if not self.video:
-            self.show_error("Сначала получите информацию")
-            return
+            if not self.get_video():
+                return
 
         if self.download_mode.get() == "Видео":
             self.episodes = [self.video]
@@ -277,7 +300,7 @@ class MainWindow(ctk.CTkFrame):
         selected = self.episodes_panel.get_selected()
 
         if not selected:
-            self.show_error("Выберите видео")
+            self.show_error("Выберите что скачать")
             return
 
         self.download_button.configure(state="disabled")

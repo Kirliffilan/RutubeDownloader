@@ -48,5 +48,6 @@ class ErrorOverlay:
         ).pack(pady=20)
 
     def destroy(self):
-        self.overlay.destroy()
-        self.overlay = None
+        if self.overlay:
+            self.overlay.destroy()
+            self.overlay = None
