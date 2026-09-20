@@ -1,6 +1,7 @@
 import customtkinter as ctk
 import threading
 import shutil
+import re
 
 from config import get_settings, save_settings
 from rutube import get_video_info
@@ -25,16 +26,13 @@ class MainWindow(ctk.CTkFrame):
 
         self.searcher = Searcher()
         self.downloader = Downloader()
-
         self.download_mode = ctk.StringVar(value="Видео")
 
         self.create_widgets()
 
     def create_widgets(self):
         self.grid_columnconfigure(0, weight=1)
-
         self.grid_columnconfigure(1, weight=1)
-
         self.grid_rowconfigure(6, weight=1)
 
         ctk.CTkLabel(
@@ -82,7 +80,6 @@ class MainWindow(ctk.CTkFrame):
         ).grid(row=2, column=0, sticky="w", pady=10)
 
         actions = ctk.CTkFrame(self, fg_color="transparent")
-
         actions.grid(row=2, column=1, sticky="e")
 
         ctk.CTkButton(
@@ -90,7 +87,9 @@ class MainWindow(ctk.CTkFrame):
         ).pack(side="left", padx=5)
 
         ctk.CTkButton(
-            actions, text="🔎 Найти", corner_radius=15, command=self.search
+            actions, text="🔎 Найти", corner_radius=15,
+            fg_color="#238636", hover_color="#2ea042",
+            command=self.search,
         ).pack(side="left", padx=5)
 
         ctk.CTkButton(
@@ -234,6 +233,13 @@ class MainWindow(ctk.CTkFrame):
 
         try:
             self.video = get_video_info(url)
+
+            title = self.video.get("title", "").lower()
+            if re.search(r"\bсерия\b", title):
+                self.download_mode.set("Сериал")
+            else:
+                self.download_mode.set("Видео")
+
             self.after(0, self.update_info)
             self.video["size"] = get_video_size(self.video["url"], self.settings["quality"])
             return True
