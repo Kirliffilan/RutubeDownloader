@@ -22,8 +22,8 @@ def get_default_settings():
     return {
         "save_path": get_default_save_path(),
         "quality": "Максимальное",
-        "max_seasons": 2,
-        "max_episodes": 2,
+        "max_seasons": 5,
+        "max_episodes": 10,
     }
 
 
