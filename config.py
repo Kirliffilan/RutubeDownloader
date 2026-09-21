@@ -24,6 +24,7 @@ def get_default_settings():
         "quality": "Максимальное",
         "max_seasons": 5,
         "max_episodes": 10,
+        "video_folder": "",
     }
 
 
@@ -33,7 +34,6 @@ def get_settings():
     if not os.path.exists(path):
         settings = get_default_settings()
         save_settings(settings)
-
         return settings
 
     try:
@@ -43,7 +43,6 @@ def get_settings():
     except Exception:
         settings = get_default_settings()
         save_settings(settings)
-
         return settings
 
     default = get_default_settings()

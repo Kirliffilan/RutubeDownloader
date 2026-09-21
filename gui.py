@@ -2,6 +2,7 @@ import customtkinter as ctk
 
 from ui.main_window import MainWindow
 
+
 class App(ctk.CTk):
     def __init__(self):
         super().__init__()

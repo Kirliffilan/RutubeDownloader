@@ -1,13 +1,10 @@
 import customtkinter as ctk
 import threading
 import shutil
-import re
 
 from config import get_settings, save_settings
-from rutube import get_video_info
-from search import Searcher
+from rutube import get_video_info, get_serial_episodes
 from downloader import Downloader
-from utils import get_video_size
 
 from ui.settings_window import SettingsWindow
 from ui.episodes_panel import EpisodesPanel
@@ -24,7 +21,6 @@ class MainWindow(ctk.CTkFrame):
         self.episodes = []
         self.error_overlay = None
 
-        self.searcher = Searcher()
         self.downloader = Downloader()
         self.download_mode = ctk.StringVar(value="Видео")
 
@@ -92,18 +88,7 @@ class MainWindow(ctk.CTkFrame):
             command=self.search,
         ).pack(side="left", padx=5)
 
-        ctk.CTkButton(
-            actions,
-            text="⛔",
-            width=50,
-            fg_color="#ed4245",
-            hover_color="#c03550",
-            corner_radius=15,
-            command=self.searcher.stop_search,
-        ).pack(side="left")
-
         mode_frame = ctk.CTkFrame(self, fg_color="transparent")
-
         mode_frame.grid(row=3, column=0, columnspan=2, sticky="w", pady=5)
 
         ctk.CTkRadioButton(
@@ -234,32 +219,30 @@ class MainWindow(ctk.CTkFrame):
         try:
             self.video = get_video_info(url)
 
-            title = self.video.get("title", "").lower()
-            if re.search(r"\bсерия\b", title):
+            if self.video.get("is_serial"):
                 self.download_mode.set("Сериал")
             else:
                 self.download_mode.set("Видео")
 
             self.after(0, self.update_info)
-            self.video["size"] = get_video_size(self.video["url"], self.settings["quality"])
             return True
         except Exception as e:
             self.after(0, lambda: self.show_error(str(e)))
             return False
 
-
     def update_info(self):
         self.info.delete("0.0", "end")
-        self.info.insert(
-            "end",
-            (
-                f"Название: {self.video['title']}\n"
-                f"Автор: {self.video['author_name']}\n"
+        text = (
+            f"Название: {self.video['title']}\n"
+            f"Автор: {self.video['author_name']}\n"
+        )
+        if self.download_mode.get() == "Сериал":
+            text += (
                 f"Сериал: {self.video['show_name']}\n"
                 f"Сезон: {self.video.get('season') or '-'}\n"
                 f"Серия: {self.video.get('episode') or '-'}"
-            ),
-        )
+            )
+        self.info.insert("end", text)
 
     def search(self):
         if not self.video:
@@ -275,16 +258,27 @@ class MainWindow(ctk.CTkFrame):
         threading.Thread(target=self.search_thread, daemon=True).start()
 
     def search_thread(self):
-        result = self.searcher.find_seasons(
-            self.video, self.settings, self.log_panel.callback
+        self.log_panel.callback(
+            "log",
+            "Получение сезонов и серий через API RUTUBE..."
         )
-        self.episodes = []
 
-        for season in sorted(result):
-            for episode in sorted(result[season]):
-                self.episodes.append(result[season][episode])
+        self.episodes = get_serial_episodes(
+            self.video["rutube_id"],
+            self.settings,
+            self.api_log
+        )
 
-        self.after(0, self.update_episodes)
+        self.after(
+            0,
+            self.update_episodes
+        )
+
+    def api_log(self, level, text):
+        self.after(
+            0,
+            lambda: self.log_panel.callback(level, text)
+        )
 
     def update_episodes(self):
         self.episodes_panel.set_episodes(self.episodes)
@@ -327,6 +321,7 @@ class MainWindow(ctk.CTkFrame):
                 selected,
                 self.settings,
                 self.video.get("show_name", "Видео"),
+                self.download_mode.get(),
                 self.log_panel.callback,
             )
 
