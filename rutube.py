@@ -168,7 +168,7 @@ def get_season_episodes(video_id, season, limit):
         return []
 
     data=get_first_page(data)
-    episodes=get_all_pages(data)
+    episodes=data.get("results",[])
 
     episodes.sort(
         key=lambda x:(
@@ -176,6 +176,8 @@ def get_season_episodes(video_id, season, limit):
             x.get("title","")
         )
     )
+    if limit:
+        episodes=episodes[:limit]
 
     return episodes
 

@@ -10,6 +10,7 @@ from ui.settings_window import SettingsWindow
 from ui.episodes_panel import EpisodesPanel
 from ui.log_panel import LogPanel
 from ui.error_overlay import ErrorOverlay
+from ui.history_window import HistoryWindow
 
 
 class MainWindow(ctk.CTkFrame):
@@ -80,6 +81,13 @@ class MainWindow(ctk.CTkFrame):
 
         ctk.CTkButton(
             actions, text="⚙ Настройки", corner_radius=15, command=self.show_settings
+        ).pack(side="left", padx=5)
+
+        ctk.CTkButton(
+            actions,
+            text="📜 История",
+            corner_radius=15,
+            command=self.show_history
         ).pack(side="left", padx=5)
 
         ctk.CTkButton(
@@ -186,6 +194,9 @@ class MainWindow(ctk.CTkFrame):
 
     def show_settings(self):
         SettingsWindow(self.winfo_toplevel(), self.settings, self.save_settings)
+
+    def show_history(self):
+        HistoryWindow(self.winfo_toplevel())
 
     def save_settings(self, data):
         self.settings = data

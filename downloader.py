@@ -197,7 +197,7 @@ class Downloader:
         file = self.find_downloaded_file(folder, item["title"])
 
         if file:
-            save_history(item, file)
+            save_history(item, file, settings)
 
         return True
 
