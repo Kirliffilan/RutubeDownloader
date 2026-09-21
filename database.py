@@ -13,24 +13,17 @@ def get_connection():
 
 
 def add_column(cursor, table, column, data_type):
-    cursor.execute(
-        f"PRAGMA table_info({table})"
-    )
+    cursor.execute(f"PRAGMA table_info({table})")
 
-    columns=[
-        row[1]
-        for row in cursor.fetchall()
-    ]
+    columns = [row[1] for row in cursor.fetchall()]
 
     if column not in columns:
-        cursor.execute(
-            f"ALTER TABLE {table} ADD COLUMN {column} {data_type}"
-        )
+        cursor.execute(f"ALTER TABLE {table} ADD COLUMN {column} {data_type}")
 
 
 def init_database():
     with get_connection() as connection:
-        cursor=connection.cursor()
+        cursor = connection.cursor()
 
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS history (
@@ -47,11 +40,11 @@ def init_database():
             )
         """)
 
-        add_column(cursor,"history","type","TEXT")
-        add_column(cursor,"history","season","INTEGER")
-        add_column(cursor,"history","episode","INTEGER")
-        add_column(cursor,"history","size","INTEGER")
-        add_column(cursor,"history","quality","TEXT")
+        add_column(cursor, "history", "type", "TEXT")
+        add_column(cursor, "history", "season", "INTEGER")
+        add_column(cursor, "history", "episode", "INTEGER")
+        add_column(cursor, "history", "size", "INTEGER")
+        add_column(cursor, "history", "quality", "TEXT")
 
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS errors (
@@ -73,16 +66,16 @@ def init_database():
 
 def save_history(item, file, settings=None):
     with get_connection() as connection:
-        cursor=connection.cursor()
+        cursor = connection.cursor()
 
-        video_type="serial" if item.get("season") else "video"
-        size=0
+        video_type = "serial" if item.get("season") else "video"
+        size = 0
         if os.path.exists(file):
-            size=os.path.getsize(file)
+            size = os.path.getsize(file)
 
-        quality=None
+        quality = None
         if settings:
-            quality=settings.get("quality")
+            quality = settings.get("quality")
 
         cursor.execute(
             """
@@ -107,15 +100,15 @@ def save_history(item, file, settings=None):
                 item.get("season"),
                 item.get("episode"),
                 size,
-                quality
-            )
+                quality,
+            ),
         )
         connection.commit()
 
 
 def log_error(error):
     with get_connection() as connection:
-        cursor=connection.cursor()
+        cursor = connection.cursor()
         cursor.execute(
             """
             INSERT INTO errors (
@@ -124,14 +117,14 @@ def log_error(error):
             )
             VALUES (?, datetime('now'))
             """,
-            (error,)
+            (error,),
         )
         connection.commit()
 
 
 def get_history():
     with get_connection() as connection:
-        cursor=connection.cursor()
+        cursor = connection.cursor()
         cursor.execute("""
             SELECT *
             FROM history
@@ -143,16 +136,16 @@ def get_history():
 
 def delete_history(history_id):
     with get_connection() as connection:
-        cursor=connection.cursor()
+        cursor = connection.cursor()
         cursor.execute(
             """
             SELECT file
             FROM history
             WHERE id=?
             """,
-            (history_id,)
+            (history_id,),
         )
-        row=cursor.fetchone()
+        row = cursor.fetchone()
         if row and row[0]:
             try:
                 if os.path.exists(row[0]):
@@ -164,31 +157,28 @@ def delete_history(history_id):
             DELETE FROM history
             WHERE id=?
             """,
-            (history_id,)
+            (history_id,),
         )
         connection.commit()
 
+
 def clear_history():
     with get_connection() as connection:
-        cursor=connection.cursor()
-        cursor.execute(
-            """
+        cursor = connection.cursor()
+        cursor.execute("""
             SELECT file
             FROM history
-            """
-        )
-        files=cursor.fetchall()
+            """)
+        files = cursor.fetchall()
         for row in files:
-            file=row[0]
+            file = row[0]
             if file:
                 try:
                     if os.path.exists(file):
                         os.remove(file)
                 except Exception:
                     pass
-        cursor.execute(
-            """
+        cursor.execute("""
             DELETE FROM history
-            """
-        )
+            """)
         connection.commit()

@@ -115,161 +115,124 @@ def is_serial(video_id):
     except Exception:
         return False
 
+
 def add_unique_items(target, items):
-    ids={item.get("id") for item in target}
+    ids = {item.get("id") for item in target}
     for item in items:
         if item.get("id") not in ids:
             target.append(item)
             ids.add(item.get("id"))
 
 
-def get_first_page(data):
-    while data.get("previous"):
+def collect_previous_pages(data):
+    results = []
+    previous = data.get("previous")
+    while previous:
         try:
-            data=api_get(data["previous"])
+            page = api_get(previous)
         except Exception:
             break
+        add_unique_items(results, page.get("results", []))
+        previous = page.get("previous")
+    return results
 
-    return data
 
-
-def get_all_pages(data):
-    results=[]
-    add_unique_items(
-        results,
-        data.get("results",[])
-    )
-    next_url=data.get("next")
-
+def collect_next_pages(data):
+    results = []
+    next_url = data.get("next")
     while next_url:
         try:
-            page=api_get(next_url)
+            page = api_get(next_url)
         except Exception:
             break
-        add_unique_items(
-            results,
-            page.get("results",[])
-        )
-        next_url=page.get("next")
+        add_unique_items(results, page.get("results", []))
+        next_url = page.get("next")
 
     return results
 
+
 def get_season_episodes(video_id, season, limit):
-    url=f"https://rutube.ru/pangolin/api/web/serial/{video_id}/{season}/"
+    url = f"https://rutube.ru/pangolin/api/web/serial/{video_id}/{season}/"
     try:
-        data=api_get(
-            url,
-            {
-                "limit":limit,
-                "offset":-2
-            }
-        )
+        first_page = api_get(url, {"limit": limit, "offset": -2})
     except Exception:
         return []
 
-    data=get_first_page(data)
-    episodes=data.get("results",[])
+    episodes = []
+    add_unique_items(episodes, first_page.get("results", []))
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        previous_future = executor.submit(collect_previous_pages, first_page)
+        next_future = executor.submit(collect_next_pages, first_page)
+        previous_pages = previous_future.result()
+        next_pages = next_future.result()
+    add_unique_items(episodes, previous_pages)
+    add_unique_items(episodes, next_pages)
 
-    episodes.sort(
-        key=lambda x:(
-            x.get("episode") or 999,
-            x.get("title","")
-        )
-    )
+    episodes.sort(key=lambda x: (x.get("episode") or 999, x.get("title", "")))
+
     if limit:
-        episodes=episodes[:limit]
+        episodes = episodes[:limit]
 
     return episodes
 
 
 def get_serial_episodes(video_id, settings, serial_data, callback=None):
-    episodes=[]
-    max_seasons=settings.get("max_seasons",20)
-    limit=settings.get("max_episodes",100)
-    available_seasons=[
+    episodes = []
+    max_seasons = settings.get("max_seasons", 20)
+    limit = settings.get("max_episodes", 100)
+    available_seasons = [
         item.get("number")
-        for item in serial_data.get("results",[])
+        for item in serial_data.get("results", [])
         if item.get("number")
     ]
-    seasons=available_seasons[:max_seasons]
+    seasons = available_seasons[:max_seasons]
 
     with ThreadPoolExecutor(max_workers=10) as executor:
-        futures=[
-            executor.submit(
-                get_season_episodes,
-                video_id,
-                season,
-                limit
-            )
+        futures = [
+            executor.submit(get_season_episodes, video_id, season, limit)
             for season in seasons
         ]
         for future in as_completed(futures):
-            result=future.result()
+            result = future.result()
             for item in result:
                 if item["id"] not in [x["rutube_id"] for x in episodes]:
-                    episodes.append({
-                        "rutube_id":item["id"],
-                        "url":item["video_url"],
-                        "title":item["title"],
-                        "season":item.get("season"),
-                        "episode":item.get("episode"),
-                        "show_name":item["title"],
-                        "author_id":item["author"]["id"],
-                        "author_name":item["author"]["name"],
-                    })
+                    episodes.append(
+                        {
+                            "rutube_id": item["id"],
+                            "url": item["video_url"],
+                            "title": item["title"],
+                            "season": item.get("season"),
+                            "episode": item.get("episode"),
+                            "show_name": item["title"],
+                            "author_id": item["author"]["id"],
+                            "author_name": item["author"]["name"],
+                        }
+                    )
 
-    episodes.sort(
-        key=lambda x:(
-            x.get("season") or 999,
-            x.get("episode") or 999
-        )
-    )
+    episodes.sort(key=lambda x: (x.get("season") or 999, x.get("episode") or 999))
 
     def check_size(item):
         try:
-            size=get_video_size(
-                item["url"],
-                settings["quality"]
-            )
-            item["size"]=size
+            size = get_video_size(item["url"], settings["quality"])
+            item["size"] = size
             if callback:
                 callback(
                     "log",
-                    f"Проверена: {item['season']} сезон {item['episode']} серия | {size/1024/1024:.0f} MB"
+                    f"Проверена: {item['season']} сезон {item['episode']} серия | {size/1024/1024:.0f} MB",
                 )
         except Exception:
-            item["size"]=0
+            item["size"] = 0
         return item
 
     with ThreadPoolExecutor(max_workers=10) as executor:
-        futures=[
-            executor.submit(check_size,item)
-            for item in episodes
-        ]
-        episodes=[
-            future.result()
-            for future in as_completed(futures)
-        ]
-    episodes.sort(
-        key=lambda x:(
-            x.get("season") or 999,
-            x.get("episode") or 999
-        )
-    )
+        futures = [executor.submit(check_size, item) for item in episodes]
+        episodes = [future.result() for future in as_completed(futures)]
+    episodes.sort(key=lambda x: (x.get("season") or 999, x.get("episode") or 999))
 
-    total_size=sum(
-        item.get("size",0)
-        for item in episodes
-    )
+    total_size = sum(item.get("size", 0) for item in episodes)
 
     if callback:
-        callback(
-            "log",
-            f"Всего серий: {len(episodes)}"
-        )
-        callback(
-            "log",
-            f"Общий размер всех серий: {total_size/1024/1024/1024:.2f} GB"
-        )
+        callback("log", f"Всего серий: {len(episodes)}")
+        callback("log", f"Общий размер всех серий: {total_size/1024/1024/1024:.2f} GB")
 
     return episodes

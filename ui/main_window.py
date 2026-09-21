@@ -1,10 +1,12 @@
 import customtkinter as ctk
 import threading
 import shutil
+import os
 
 from config import get_settings, save_settings
 from rutube import get_video_info, get_serial_episodes
 from downloader import Downloader
+from utils import get_video_size
 
 from ui.settings_window import SettingsWindow
 from ui.episodes_panel import EpisodesPanel
@@ -84,15 +86,15 @@ class MainWindow(ctk.CTkFrame):
         ).pack(side="left", padx=5)
 
         ctk.CTkButton(
-            actions,
-            text="📜 История",
-            corner_radius=15,
-            command=self.show_history
+            actions, text="📜 История", corner_radius=15, command=self.show_history
         ).pack(side="left", padx=5)
 
         ctk.CTkButton(
-            actions, text="🔎 Найти", corner_radius=15,
-            fg_color="#238636", hover_color="#2ea042",
+            actions,
+            text="🔎 Найти",
+            corner_radius=15,
+            fg_color="#238636",
+            hover_color="#2ea042",
             command=self.search,
         ).pack(side="left", padx=5)
 
@@ -244,8 +246,7 @@ class MainWindow(ctk.CTkFrame):
     def update_info(self):
         self.info.delete("0.0", "end")
         text = (
-            f"Название: {self.video['title']}\n"
-            f"Автор: {self.video['author_name']}\n"
+            f"Название: {self.video['title']}\n" f"Автор: {self.video['author_name']}\n"
         )
         if self.download_mode.get() == "Сериал":
             text += (
@@ -261,36 +262,32 @@ class MainWindow(ctk.CTkFrame):
                 return
 
         if self.download_mode.get() == "Видео":
+            self.video["size"] = get_video_size(
+                self.video["url"], self.settings["quality"]
+            )
             self.episodes = [self.video]
             self.episodes_panel.set_episodes(self.episodes)
-            self.log_panel.callback("log", "Добавлено видео")
+            self.log_panel.callback(
+                "log", f"Видео: {self.video['size'] / 1024 / 1024:.0f} MB"
+            )
             return
 
         threading.Thread(target=self.search_thread, daemon=True).start()
 
     def search_thread(self):
-        self.log_panel.callback(
-            "log",
-            "Получение сезонов и серий через API RUTUBE..."
-        )
+        self.log_panel.callback("log", "Получение сезонов и серий через API RUTUBE...")
 
         self.episodes = get_serial_episodes(
             self.video["rutube_id"],
             self.settings,
             self.video["serial_data"],
-            self.api_log
+            self.api_log,
         )
 
-        self.after(
-            0,
-            self.update_episodes
-        )
+        self.after(0, self.update_episodes)
 
     def api_log(self, level, text):
-        self.after(
-            0,
-            lambda: self.log_panel.callback(level, text)
-        )
+        self.after(0, lambda: self.log_panel.callback(level, text))
 
     def update_episodes(self):
         self.episodes_panel.set_episodes(self.episodes)
@@ -301,7 +298,12 @@ class MainWindow(ctk.CTkFrame):
         for item in selected:
             total_size += item.get("size", 0)
 
-        free_space = shutil.disk_usage(self.settings["save_path"]).free
+        path = self.settings.get("save_path", "")
+
+        if not os.path.exists(path):
+            free_space = 0
+        else:
+            free_space = shutil.disk_usage(path).free
 
         self.log_panel.callback(
             "log",
