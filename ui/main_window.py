@@ -266,6 +266,7 @@ class MainWindow(ctk.CTkFrame):
         self.episodes = get_serial_episodes(
             self.video["rutube_id"],
             self.settings,
+            self.video["serial_data"],
             self.api_log
         )
 
