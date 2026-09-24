@@ -28,6 +28,7 @@ jobs:
           fi
 
           printf " # [%s]\n\n%s\n\n" "$VERSION" "$BODY" > new_changelog.md
+          echo "test"
           cat CHANGELOG.md >> new_changelog.md 2>/dev/null || true
           mv new_changelog.md CHANGELOG.md
 
