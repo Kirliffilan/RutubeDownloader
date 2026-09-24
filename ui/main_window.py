@@ -334,7 +334,7 @@ class MainWindow(ctk.CTkFrame):
             self.downloader.download_all(
                 selected,
                 self.settings,
-                self.video.get("show_name", "Видео"),
+                selected[0].get("show_name", self.video.get("show_name", "Видео")),
                 self.download_mode.get(),
                 self.log_panel.callback,
             )

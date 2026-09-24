@@ -114,17 +114,28 @@ class Downloader:
         episode = item.get("episode")
 
         if mode == "Сериал":
-            folder = os.path.join(settings["save_path"], show_name, f"{season} сезон")
-            filename = f"{season}_{episode} {item['title']}.%(ext)s"
+            folder = os.path.join(
+                settings["save_path"],
+                clean_filename(show_name),
+                f"{season} сезон"
+            )
+            episode_title = clean_filename(item.get("episode_title", ""))
+            if episode_title:
+                filename = f"{season}_{episode} {episode_title}.%(ext)s"
+            else:
+                filename = f"{season}_{episode} серия.%(ext)s"
         else:
             video_folder = settings.get("video_folder", "")
 
             if video_folder:
-                folder = os.path.join(settings["save_path"], video_folder)
+                folder = os.path.join(
+                    settings["save_path"],
+                    clean_filename(video_folder)
+                )
             else:
                 folder = settings["save_path"]
 
-            filename = f"{item['title']}.%(ext)s"
+            filename = f"{clean_filename(item['title'])}.%(ext)s"
 
         os.makedirs(folder, exist_ok=True)
 
@@ -134,7 +145,6 @@ class Downloader:
             free_space = shutil.disk_usage(folder).free
 
             callback("log", f"Расчётный размер: {estimated_size / 1024 / 1024:.2f} MB")
-
             callback("log", f"Свободное место: {free_space / 1024 / 1024:.2f} MB")
 
             if free_space < estimated_size:

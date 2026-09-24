@@ -6,6 +6,51 @@ from utils import get_video_size
 
 HEADERS = {"User-Agent": "Mozilla/5.0", "Referer": "https://rutube.ru/"}
 
+def get_show_name(title):
+    match = re.search(
+        r"^(.*?)\s+\d+\s+сезон\s+\d+\s+серия",
+        title,
+        re.IGNORECASE
+    )
+    if match:
+        return match.group(1).strip()
+
+    match = re.search(
+        r"^(.*?)\s+(?:специальный выпуск|спецвыпуск|спец\.?\s*выпуск)",
+        title,
+        re.IGNORECASE
+    )
+    if match:
+        return match.group(1).strip()
+
+    title = re.sub(
+        r"\s*\(сериал,\s*\d{4}\)",
+        "",
+        title,
+        flags=re.IGNORECASE
+    )
+
+    return title.strip()
+
+
+def get_episode_name(title):
+    match = re.search(
+        r"\d+\s+сезон\s+\d+\s+серия\s*(.*?)\s*\(сериал,\s*\d{4}\)",
+        title,
+        re.IGNORECASE
+    )
+    if match:
+        return match.group(1).strip(" -«»")
+
+    match = re.search(
+        r"специальный выпуск\s*[«\"](.*?)[»\"]",
+        title,
+        re.IGNORECASE
+    )
+    if match:
+        return match.group(1).strip()
+
+    return ""
 
 def api_get(url, params=None):
     last_error = None
@@ -94,7 +139,7 @@ def get_video_info(url):
         "title": title,
         "author_id": author_id,
         "author_name": author_name,
-        "show_name": title,
+        "show_name": get_show_name(title),
         "season": season,
         "episode": episode,
         "is_serial": is_serial,
@@ -203,7 +248,8 @@ def get_serial_episodes(video_id, settings, serial_data, callback=None):
                             "title": item["title"],
                             "season": item.get("season"),
                             "episode": item.get("episode"),
-                            "show_name": item["title"],
+                            "show_name": get_show_name(item["title"]),
+                            "episode_title": get_episode_name(item["title"]),
                             "author_id": item["author"]["id"],
                             "author_name": item["author"]["name"],
                         }

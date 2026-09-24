@@ -48,12 +48,10 @@ class EpisodesPanel(ctk.CTkFrame):
 
         for item in episodes:
             season = item.get("season")
-
             episode = item.get("episode")
 
             if season and episode:
-                text = f"{season} сезон " f"{episode} серия" f" | {item['title']}"
-
+                text = f"{season} сезон {episode} серия | {item.get('episode_title') or item.get('show_name')}"
             else:
                 text = f"🎬 {item['title']}"
 
