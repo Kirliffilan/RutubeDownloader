@@ -27,7 +27,7 @@ jobs:
             BODY="Без описания изменений"
           fi
 
-          printf "# [%s]\n\n%s\n\n" "$VERSION" "$BODY" > new_changelog.md
+          printf "\n# [%s]\n\n%s\n\n" "$VERSION" "$BODY" > new_changelog.md
           cat CHANGELOG.md >> new_changelog.md 2>/dev/null || true
           mv new_changelog.md CHANGELOG.md
 
