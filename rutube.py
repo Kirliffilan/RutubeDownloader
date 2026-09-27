@@ -8,7 +8,7 @@ HEADERS = {"User-Agent": "Mozilla/5.0", "Referer": "https://rutube.ru/"}
 
 def get_show_name(title):
     match = re.search(
-        r"^(.*?)\s+\d+\s+сезон\s+\d+\s+серия",
+        r"^(.*?)\s+(?:\d+\s+сезон\s+)?\d+\s+серия",
         title,
         re.IGNORECASE
     )
@@ -35,7 +35,7 @@ def get_show_name(title):
 
 def get_episode_name(title):
     match = re.search(
-        r"\d+\s+сезон\s+\d+\s+серия\s*(.*?)\s*\(сериал,\s*\d{4}\)",
+        r"(?:\d+\s+сезон\s+)?\d+\s+серия\s*(.*?)\s*\(сериал,\s*\d{4}\)",
         title,
         re.IGNORECASE
     )
@@ -124,8 +124,6 @@ def get_video_info(url):
                 f"https://rutube.ru/pangolin/api/web/serial/{video_id}/{season}/",
                 {"limit": 19, "offset": -2},
             )
-            print("SEASON DATA")
-            print(season_data)
             if season_data:
                 for item in season_data.get("results", []):
                     if item.get("id") == video_id:
