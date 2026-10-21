@@ -3,3 +3,4 @@ rutube_downloader.db
 *.spec
 dist/
 build/
+plan.md

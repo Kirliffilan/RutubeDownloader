@@ -1,7 +1,13 @@
 import customtkinter as ctk
 from tkinter import ttk
 
-from database import get_history, delete_history, clear_history
+from database import (
+    get_history,
+    delete_history,
+    clear_history,
+    delete_history_by_season,
+    delete_history_by_show,
+)
 
 from ui.confirm_overlay import ConfirmOverlay
 
@@ -51,32 +57,41 @@ class HistoryWindow(ctk.CTkToplevel):
         self.table_frame = ctk.CTkFrame(self)
         self.table_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
-        columns = ("id", "title", "type", "season", "episode", "quality", "date")
+        columns = ("data",)
+        self.table = ttk.Treeview(
+            self.table_frame, columns=columns, show="tree headings"
+        )
 
-        self.table = ttk.Treeview(self.table_frame, columns=columns, show="headings")
+        self.table.heading("#0", text="История загрузок")
+        self.table.heading("data", text="")
+        self.table.column("#0", width=600, minwidth=300)
+        self.table.column("data", width=0, stretch=False)
 
-        self.table.heading("id", text="ID")
-        self.table.heading("title", text="Название")
-        self.table.heading("type", text="Тип")
-        self.table.heading("season", text="Сезон")
-        self.table.heading("episode", text="Серия")
-        self.table.heading("quality", text="Качество")
-        self.table.heading("date", text="Дата")
+        vsb = ttk.Scrollbar(
+            self.table_frame, orient="vertical", command=self.table.yview
+        )
+        hsb = ttk.Scrollbar(
+            self.table_frame, orient="horizontal", command=self.table.xview
+        )
+        self.table.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
 
-        self.table.column("id", width=40)
-        self.table.column("title", width=300)
-        self.table.column("type", width=80)
-        self.table.column("season", width=60)
-        self.table.column("episode", width=60)
-        self.table.column("quality", width=100)
-        self.table.column("date", width=150)
+        self.table.grid(row=0, column=0, sticky="nsew")
+        vsb.grid(row=0, column=1, sticky="ns")
+        hsb.grid(row=1, column=0, sticky="ew")
 
-        self.table.pack(fill="both", expand=True)
+        self.table_frame.grid_rowconfigure(0, weight=1)
+        self.table_frame.grid_columnconfigure(0, weight=1)
+
+        self.table.bind("<Double-1>", self.on_double_click)
 
         buttons = ctk.CTkFrame(self)
         buttons.pack(fill="x", padx=10, pady=10)
 
         ctk.CTkButton(buttons, text="Обновить", command=self.load_history).pack(
+            side="left", padx=5
+        )
+
+        ctk.CTkButton(buttons, text="Копировать ссылку", command=self.copy_url).pack(
             side="left", padx=5
         )
 
@@ -88,39 +103,202 @@ class HistoryWindow(ctk.CTkToplevel):
             side="left", padx=5
         )
 
+        self.history_data = {}
+
     def load_history(self):
         for item in self.table.get_children():
             self.table.delete(item)
 
-        for row in get_history():
-            self.table.insert(
+        self.history_data = {}
+        rows = get_history()
+
+        videos = []
+        serials = {}
+
+        for row in rows:
+            item_id = row["id"]
+            self.history_data[item_id] = row
+
+            if row["type"] == "video" or not row["show_name"]:
+                videos.append(row)
+            else:
+                show_name = row["show_name"]
+                season = row["season"] if row["season"] else 0
+                if show_name not in serials:
+                    serials[show_name] = {}
+                if season not in serials[show_name]:
+                    serials[show_name][season] = []
+                serials[show_name][season].append(row)
+
+        for video in videos:
+            self.add_video_item(video)
+
+        for show_name, seasons in sorted(serials.items()):
+            show_id = self.table.insert(
                 "",
                 "end",
-                values=(
-                    row[0],
-                    row[1],
-                    row[5],
-                    row[6] if row[6] else "-",
-                    row[7] if row[7] else "-",
-                    row[9] if row[9] else "-",
-                    row[4],
-                ),
+                text=f"📺 {show_name}",
+                open=True,
+                values=("show", show_name),
             )
 
-    def delete_selected(self):
+            for season_num in sorted(seasons.keys()):
+                episodes = seasons[season_num]
+                episodes.sort(key=lambda x: x["episode"] if x["episode"] else 999)
+
+                season_text = (
+                    f"📁 {season_num} сезон ({len(episodes)} серий)"
+                    if season_num
+                    else f"📁 Без сезона ({len(episodes)} серий)"
+                )
+                season_id = self.table.insert(
+                    show_id,
+                    "end",
+                    text=season_text,
+                    open=True,
+                    values=("season", show_name, season_num),
+                )
+
+                for ep in episodes:
+                    ep_title = ep["title"]
+                    if ep["episode"]:
+                        ep_text = f"🎬 {ep['episode']} серия — {ep_title}"
+                    else:
+                        ep_text = f"🎬 {ep_title}"
+                    self.table.insert(
+                        season_id,
+                        "end",
+                        text=ep_text,
+                        open=False,
+                        values=("episode", ep["id"]),
+                    )
+
+    def add_video_item(self, video):
+        title = video["title"]
+        quality = video["quality"] if video["quality"] else "-"
+        date = video["date"]
+        item_text = f"🎬 {title} [{quality}] ({date})"
+        self.table.insert("", "end", text=item_text, open=False, values=("video", video["id"]))
+
+    def on_double_click(self, event):
+        self.copy_url()
+
+    def get_selected_item_data(self):
         selected = self.table.selection()
         if not selected:
+            return None, None, None
+        item = selected[0]
+        values = self.table.item(item, "values")
+        if not values:
+            return None, None, None
+        item_type = values[0]
+        return item, item_type, values
+
+    def copy_url(self):
+        item, item_type, values = self.get_selected_item_data()
+        if not item:
+            self.show_notification("Ничего не выбрано")
             return
-        item = self.table.item(selected[0])
-        history_id = item["values"][0]
-        ConfirmOverlay(
-            self,
-            "Удалить запись и файл с диска?",
-            lambda: self.remove_history(history_id),
+
+        url = None
+
+        if item_type == "video":
+            history_id = int(values[1])
+            row = self.history_data.get(history_id)
+            if row:
+                url = row["url"]
+        elif item_type == "episode":
+            history_id = int(values[1])
+            row = self.history_data.get(history_id)
+            if row:
+                url = row["url"]
+        elif item_type == "season":
+            show_name = values[1]
+            season = int(values[2]) if values[2].isdigit() else values[2]
+            for row in self.history_data.values():
+                if (
+                    row["show_name"] == show_name
+                    and row["season"] == season
+                    and row["type"] == "serial"
+                ):
+                    url = row["series_url"] or row["url"]
+                    break
+        elif item_type == "show":
+            show_name = values[1]
+            for row in self.history_data.values():
+                if row["show_name"] == show_name and row["type"] == "serial":
+                    url = row["series_url"] or row["url"]
+                    break
+
+        if not url:
+            self.show_notification("Ссылка недоступна")
+            return
+
+        self.clipboard_clear()
+        self.clipboard_append(url)
+        self.show_notification("Ссылка скопирована")
+
+    def show_notification(self, text):
+        notif = ctk.CTkLabel(
+            self, text=text, fg_color="#1f6aa5", corner_radius=8, padx=15, pady=5
         )
+        notif.place(relx=0.5, rely=0.9, anchor="center")
+        self.after(2000, notif.destroy)
+
+    def delete_selected(self):
+        item, item_type, values = self.get_selected_item_data()
+        if not item:
+            return
+
+        if item_type == "video":
+            history_id = int(values[1])
+            row = self.history_data.get(history_id)
+            if row:
+                ConfirmOverlay(
+                    self,
+                    f"Удалить видео и файл с диска?\n\n{row['title']}",
+                    lambda: self.remove_history(history_id),
+                )
+        elif item_type == "episode":
+            history_id = int(values[1])
+            row = self.history_data.get(history_id)
+            if row:
+                ep_info = (
+                    f"{row['season']} сезон {row['episode']} серия"
+                    if row["season"] and row["episode"]
+                    else row["title"]
+                )
+                ConfirmOverlay(
+                    self,
+                    f"Удалить серию и файл с диска?\n\n{ep_info} — {row['title']}",
+                    lambda: self.remove_history(history_id),
+                )
+        elif item_type == "season":
+            show_name = values[1]
+            season = int(values[2]) if values[2].isdigit() else values[2]
+            ConfirmOverlay(
+                self,
+                f"Удалить весь сезон и все его файлы?\n\n{show_name} — {season} сезон",
+                lambda: self.remove_season(show_name, season),
+            )
+        elif item_type == "show":
+            show_name = values[1]
+            ConfirmOverlay(
+                self,
+                f"Удалить весь сериал и все его файлы?\n\n{show_name}",
+                lambda: self.remove_show(show_name),
+            )
 
     def remove_history(self, history_id):
         delete_history(history_id)
+        self.load_history()
+
+    def remove_season(self, show_name, season):
+        delete_history_by_season(show_name, season)
+        self.load_history()
+
+    def remove_show(self, show_name):
+        delete_history_by_show(show_name)
         self.load_history()
 
     def clear_all(self):

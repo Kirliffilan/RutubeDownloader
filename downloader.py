@@ -27,15 +27,15 @@ class Downloader:
             f"bestvideo[height<={quality}]" + "+bestaudio/" f"best[height<={quality}]"
         )
 
-    def find_downloaded_file(self, folder, title):
+    def find_downloaded_file(self, folder, expected_filename_base):
+        """Find the downloaded file by exact expected filename base (without extension)"""
         if not os.path.exists(folder):
             return None
-        title = clean_filename(title).lower()
         for file in os.listdir(folder):
             if not file.lower().endswith(".mp4"):
                 continue
-            name = clean_filename(file).lower()
-            if title in name:
+            name = os.path.splitext(file)[0]
+            if name == expected_filename_base:
                 return os.path.join(folder, file)
         return None
 
@@ -121,9 +121,10 @@ class Downloader:
             )
             episode_title = clean_filename(item.get("episode_title", ""))
             if episode_title:
-                filename = f"{season}_{episode} {episode_title}.%(ext)s"
+                filename_base = f"{season}_{episode} {episode_title}"
             else:
-                filename = f"{season}_{episode} серия.%(ext)s"
+                filename_base = f"{season}_{episode} серия"
+            filename = f"{filename_base}.%(ext)s"
         else:
             video_folder = settings.get("video_folder", "")
 
@@ -135,7 +136,8 @@ class Downloader:
             else:
                 folder = settings["save_path"]
 
-            filename = f"{clean_filename(item['title'])}.%(ext)s"
+            filename_base = clean_filename(item['title'])
+            filename = f"{filename_base}.%(ext)s"
 
         os.makedirs(folder, exist_ok=True)
 
@@ -151,7 +153,7 @@ class Downloader:
                 callback("log", "Недостаточно места на диске. Загрузка отменена.")
                 return False
 
-        if self.find_downloaded_file(folder, item["title"]):
+        if self.find_downloaded_file(folder, filename_base):
             callback("log", "Файл уже существует")
             return "skip"
 
@@ -204,10 +206,12 @@ class Downloader:
 
             return False
 
-        file = self.find_downloaded_file(folder, item["title"])
+        file = self.find_downloaded_file(folder, filename_base)
 
         if file:
-            save_history(item, file, settings)
+            # Pass show_name and series_url for proper history saving
+            series_url = item.get("series_url") if mode == "Сериал" else None
+            save_history(item, file, settings, show_name, series_url)
 
         return True
 
@@ -249,3 +253,4 @@ class Downloader:
             callback("log", "Загрузка остановлена")
         else:
             callback("log", f"Готово. Скачано: {success}, пропущено: {skipped}")
+

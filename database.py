@@ -36,7 +36,9 @@ def init_database():
                 season INTEGER,
                 episode INTEGER,
                 size INTEGER,
-                quality TEXT
+                quality TEXT,
+                show_name TEXT,
+                series_url TEXT
             )
         """)
 
@@ -45,6 +47,8 @@ def init_database():
         add_column(cursor, "history", "episode", "INTEGER")
         add_column(cursor, "history", "size", "INTEGER")
         add_column(cursor, "history", "quality", "TEXT")
+        add_column(cursor, "history", "show_name", "TEXT")
+        add_column(cursor, "history", "series_url", "TEXT")
 
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS errors (
@@ -64,7 +68,7 @@ def init_database():
         connection.commit()
 
 
-def save_history(item, file, settings=None):
+def save_history(item, file, settings=None, show_name=None, series_url=None):
     with get_connection() as connection:
         cursor = connection.cursor()
 
@@ -77,6 +81,15 @@ def save_history(item, file, settings=None):
         if settings:
             quality = settings.get("quality")
 
+        # Determine show_name and series_url
+        if show_name is None:
+            show_name = item.get("show_name")
+        if series_url is None:
+            # For serial episodes, use the series URL if available, otherwise episode URL
+            if item.get("season"):
+                series_url = item.get("series_url") or item.get("url")
+            else:
+                series_url = item.get("url")
         cursor.execute(
             """
             INSERT INTO history (
@@ -88,9 +101,11 @@ def save_history(item, file, settings=None):
                 season,
                 episode,
                 size,
-                quality
+                quality,
+                show_name,
+                series_url
             )
-            VALUES (?, ?, ?, datetime('now'), ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, datetime('now'), ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 item.get("title"),
@@ -101,6 +116,8 @@ def save_history(item, file, settings=None):
                 item.get("episode"),
                 size,
                 quality,
+                show_name,
+                series_url,
             ),
         )
         connection.commit()
@@ -124,9 +141,10 @@ def log_error(error):
 
 def get_history():
     with get_connection() as connection:
+        connection.row_factory = sqlite3.Row
         cursor = connection.cursor()
         cursor.execute("""
-            SELECT *
+            SELECT id, title, url, file, date, type, season, episode, size, quality, show_name, series_url
             FROM history
             ORDER BY id DESC
         """)
@@ -162,6 +180,68 @@ def delete_history(history_id):
         connection.commit()
 
 
+def delete_history_by_season(show_name, season):
+    """Delete all history records for a specific show and season"""
+    with get_connection() as connection:
+        cursor = connection.cursor()
+        cursor.execute(
+            """
+            SELECT file
+            FROM history
+            WHERE show_name=? AND season=? AND type='serial'
+            """,
+            (show_name, season),
+        )
+        rows = cursor.fetchall()
+        for row in rows:
+            file = row[0]
+            if file:
+                try:
+                    if os.path.exists(file):
+                        os.remove(file)
+                except Exception:
+                    pass
+        cursor.execute(
+            """
+            DELETE FROM history
+            WHERE show_name=? AND season=? AND type='serial'
+            """,
+            (show_name, season),
+        )
+        connection.commit()
+
+
+def delete_history_by_show(show_name):
+    """Delete all history records for a specific show"""
+    with get_connection() as connection:
+        cursor = connection.cursor()
+        cursor.execute(
+            """
+            SELECT file
+            FROM history
+            WHERE show_name=? AND type='serial'
+            """,
+            (show_name,),
+        )
+        rows = cursor.fetchall()
+        for row in rows:
+            file = row[0]
+            if file:
+                try:
+                    if os.path.exists(file):
+                        os.remove(file)
+                except Exception:
+                    pass
+        cursor.execute(
+            """
+            DELETE FROM history
+            WHERE show_name=? AND type='serial'
+            """,
+            (show_name,),
+        )
+        connection.commit()
+
+
 def clear_history():
     with get_connection() as connection:
         cursor = connection.cursor()
@@ -182,3 +262,4 @@ def clear_history():
             DELETE FROM history
             """)
         connection.commit()
+
