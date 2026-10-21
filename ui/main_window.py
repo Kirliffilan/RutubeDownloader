@@ -290,7 +290,8 @@ class MainWindow(ctk.CTkFrame):
         self.after(0, lambda: self.log_panel.callback(level, text))
 
     def update_episodes(self):
-        self.episodes_panel.set_episodes(self.episodes)
+        group_by_season = self.download_mode.get() == "Сериал"
+        self.episodes_panel.set_episodes(self.episodes, group_by_season=group_by_season)
 
     def update_selected_size(self, selected):
         total_size = 0
